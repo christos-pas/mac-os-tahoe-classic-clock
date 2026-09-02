@@ -1,0 +1,9 @@
+.DS_Store
+xcuserdata/
+DerivedData/
+build/
+build.noindex/
+dist/
+*.xcuserstate
+*.moved-aside
+.swiftpm/
