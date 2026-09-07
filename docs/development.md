@@ -125,15 +125,18 @@ Bumps the build number in `Version.xcconfig` (`{major}.{minor}.{build}`), builds
 To build that zip and publish a GitHub release:
 
 ```bash
+# Working tree must be clean first.
 make release
 make release NOTES="What changed in this build."
 ```
 
-GNU make cannot take a `--notes` flag (`make release --notes "..."` is rejected). Use `NOTES=`, or:
+`make release` bumps `BUILD` in `Version.xcconfig`, builds the zip, **commits and pushes** that version bump, then creates the GitHub release tag on that commit. GNU make cannot take a `--notes` flag (`make release --notes "..."` is rejected). Use `NOTES=`, or:
 
 ```bash
 ./scripts/release.sh --notes "What changed in this build."
 ```
+
+`make dist` alone still only writes the zip and leaves `Version.xcconfig` dirty — use that for a local package. Prefer `make release` when you want git and GitHub to stay in sync.
 
 `gh` must be installed and logged in, and the repo must already exist on GitHub with an `origin` remote.
 
