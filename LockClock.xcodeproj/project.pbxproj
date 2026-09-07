@@ -24,6 +24,11 @@
 		8A1A00000000000000000057 /* WallpaperImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1A00000000000000000056 /* WallpaperImage.swift */; };
 		8A1A00000000000000000053 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1A00000000000000000052 /* SettingsWindowController.swift */; };
 		8A1A00000000000000000055 /* StatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1A00000000000000000054 /* StatusItemController.swift */; };
+		8A1A0000000000000000005B /* ScreenshotExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1A0000000000000000005A /* ScreenshotExport.swift */; };
+		8A1A0000000000000000005D /* AppIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1A0000000000000000005C /* AppIconView.swift */; };
+		8A1A0000000000000000005F /* AppleLockScreenClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1A0000000000000000005E /* AppleLockScreenClock.swift */; };
+		8A1A00000000000000000061 /* SystemClockLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1A00000000000000000060 /* SystemClockLayout.swift */; };
+		8A1A00000000000000000063 /* ClockCalibration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1A00000000000000000062 /* ClockCalibration.swift */; };
 		8A1A00000000000000000049 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8A1A00000000000000000048 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -46,6 +51,11 @@
 		8A1A00000000000000000056 /* WallpaperImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperImage.swift; sourceTree = "<group>"; };
 		8A1A00000000000000000052 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		8A1A00000000000000000054 /* StatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
+		8A1A0000000000000000005A /* ScreenshotExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotExport.swift; sourceTree = "<group>"; };
+		8A1A0000000000000000005C /* AppIconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconView.swift; sourceTree = "<group>"; };
+		8A1A0000000000000000005E /* AppleLockScreenClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleLockScreenClock.swift; sourceTree = "<group>"; };
+		8A1A00000000000000000060 /* SystemClockLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemClockLayout.swift; sourceTree = "<group>"; };
+		8A1A00000000000000000062 /* ClockCalibration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockCalibration.swift; sourceTree = "<group>"; };
 		8A1A00000000000000000048 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8A1A0000000000000000004A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		8A1A0000000000000000004B /* LockClock.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LockClock.entitlements; sourceTree = "<group>"; };
@@ -93,8 +103,13 @@
 				8A1A0000000000000000003C /* Settings.swift */,
 				8A1A00000000000000000050 /* SettingsView.swift */,
 				8A1A00000000000000000056 /* WallpaperImage.swift */,
+				8A1A0000000000000000005E /* AppleLockScreenClock.swift */,
+				8A1A00000000000000000060 /* SystemClockLayout.swift */,
+				8A1A00000000000000000062 /* ClockCalibration.swift */,
 				8A1A00000000000000000052 /* SettingsWindowController.swift */,
 				8A1A00000000000000000054 /* StatusItemController.swift */,
+				8A1A0000000000000000005A /* ScreenshotExport.swift */,
+				8A1A0000000000000000005C /* AppIconView.swift */,
 				8A1A0000000000000000003E /* LaunchAtLogin.swift */,
 				8A1A00000000000000000040 /* DiagnosticsWindowController.swift */,
 				8A1A00000000000000000042 /* LockClockLog.swift */,
@@ -196,6 +211,11 @@
 				8A1A00000000000000000057 /* WallpaperImage.swift in Sources */,
 				8A1A00000000000000000053 /* SettingsWindowController.swift in Sources */,
 				8A1A00000000000000000055 /* StatusItemController.swift in Sources */,
+				8A1A0000000000000000005B /* ScreenshotExport.swift in Sources */,
+				8A1A0000000000000000005D /* AppIconView.swift in Sources */,
+				8A1A0000000000000000005F /* AppleLockScreenClock.swift in Sources */,
+				8A1A00000000000000000061 /* SystemClockLayout.swift in Sources */,
+				8A1A00000000000000000063 /* ClockCalibration.swift in Sources */,
 				8A1A0000000000000000003F /* LaunchAtLogin.swift in Sources */,
 				8A1A00000000000000000041 /* DiagnosticsWindowController.swift in Sources */,
 				8A1A00000000000000000043 /* LockClockLog.swift in Sources */,

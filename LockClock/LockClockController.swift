@@ -31,7 +31,6 @@ final class LockClockController {
             self?.handle(state)
         }
         detector.start()
-        LaunchAtLogin.registerIfNeeded()
 
         statusItem = StatusItemController(controller: self)
 
@@ -97,7 +96,7 @@ final class LockClockController {
             skyLight.setSpaceLevel(Settings.shared.appearance.skyLightSpaceLevel)
         }
         applyClockVisibility()
-        if Settings.shared.clockEnabled {
+        if LaunchAtLogin.isEnabled {
             displays.refreshAppearance()
         }
         statusItem?.reload()
@@ -108,7 +107,7 @@ final class LockClockController {
         pendingShow?.cancel()
         pendingShow = nil
 
-        if !Settings.shared.clockEnabled {
+        if !LaunchAtLogin.isEnabled {
             LockClockLog.info("Clock disabled")
             displays.hideClock()
             return
@@ -121,7 +120,7 @@ final class LockClockController {
             }
             let work = DispatchWorkItem { [weak self] in
                 guard let self else { return }
-                guard self.detector.state == .locked, Settings.shared.clockEnabled else { return }
+                guard self.detector.state == .locked, LaunchAtLogin.isEnabled else { return }
                 LockClockLog.info("Showing clock")
                 self.displays.showClock()
             }

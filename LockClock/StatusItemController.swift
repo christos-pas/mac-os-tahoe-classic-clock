@@ -16,17 +16,6 @@ final class StatusItemController {
     func reload() {
         let menu = NSMenu()
 
-        let enabledItem = NSMenuItem(
-            title: "Show Lock Screen Clock",
-            action: #selector(toggleEnabled(_:)),
-            keyEquivalent: ""
-        )
-        enabledItem.target = self
-        enabledItem.state = Settings.shared.clockEnabled ? .on : .off
-        menu.addItem(enabledItem)
-
-        menu.addItem(.separator())
-
         let settingsItem = NSMenuItem(
             title: "Settings…",
             action: #selector(openSettings(_:)),
@@ -46,12 +35,6 @@ final class StatusItemController {
         menu.addItem(quitItem)
 
         item.menu = menu
-    }
-
-    @objc private func toggleEnabled(_ sender: NSMenuItem) {
-        Settings.shared.clockEnabled.toggle()
-        Settings.shared.notifyChange()
-        reload()
     }
 
     @objc private func openSettings(_ sender: Any?) {

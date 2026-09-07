@@ -1,18 +1,121 @@
 import AppKit
 import Foundation
 
-enum ClockFontFamily: String, CaseIterable {
-    case system
-    case helveticaNeue
-    case sfPro
-    case sfCompact
+struct ClockFontFamily: Hashable, RawRepresentable {
+    let rawValue: String
+
+    static let system = ClockFontFamily(rawValue: "system")
+
+    static func lockScreen(_ font: AppleLockScreenClock.SystemClockFont) -> ClockFontFamily {
+        ClockFontFamily(rawValue: "lockScreen.\(font.rawValue)")
+    }
+
+    static func installed(_ familyName: String) -> ClockFontFamily {
+        ClockFontFamily(rawValue: "family.\(familyName)")
+    }
+
+    /// Clock Appearance options from System Settings, in system order.
+    static var lockScreenMenuItems: [ClockFontFamily] {
+        AppleLockScreenClock.SystemClockFont.allCases.map(lockScreen)
+    }
+
+    /// Installed families that can draw clock digits (excludes private / emoji / symbol faces).
+    static var installedMenuItems: [ClockFontFamily] {
+        cachedInstalledMenuItems
+    }
+
+    private static let cachedInstalledMenuItems: [ClockFontFamily] = {
+        let lockScreenFamilies = Set(
+            AppleLockScreenClock.SystemClockFont.allCases.map(\.fontFamily)
+        )
+        let excluded: Set<String> = [
+            "Apple Color Emoji",
+            "Apple Symbols",
+            "Apple Braille",
+            ".AppleSystemUIFont"
+        ]
+        return NSFontManager.shared.availableFontFamilies
+            .filter { family in
+                guard !family.hasPrefix(".") else { return false }
+                guard !excluded.contains(family) else { return false }
+                guard !lockScreenFamilies.contains(family) else { return false }
+                return supportsClockDigits(familyName: family)
+            }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+            .map(installed)
+    }()
+
+    init(rawValue: String) {
+        self.rawValue = Self.migrateLegacyRawValue(rawValue)
+    }
 
     var displayName: String {
-        switch self {
-        case .system: return "System"
-        case .helveticaNeue: return "Helvetica Neue"
-        case .sfPro: return "SF Pro"
-        case .sfCompact: return "SF Compact"
+        if self == .system { return "System" }
+        if let lockScreenFont { return lockScreenFont.displayName }
+        if let familyName = installedFamilyName { return familyName }
+        return rawValue
+    }
+
+    var lockScreenFont: AppleLockScreenClock.SystemClockFont? {
+        guard rawValue.hasPrefix("lockScreen.") else { return nil }
+        let id = String(rawValue.dropFirst("lockScreen.".count))
+        return AppleLockScreenClock.SystemClockFont(identifier: id)
+    }
+
+    var installedFamilyName: String? {
+        guard rawValue.hasPrefix("family.") else { return nil }
+        return String(rawValue.dropFirst("family.".count))
+    }
+
+    func previewFont(size: CGFloat = 13) -> NSFont {
+        makeFont(weight: .regular, pointSize: size)
+    }
+
+    func makeFont(weight: ClockFontWeight, pointSize: CGFloat) -> NSFont {
+        if let lockScreenFont {
+            return AppleLockScreenClock.makeSystemFont(
+                identifier: lockScreenFont.rawValue,
+                weight: weight.systemWeightValue,
+                pointSize: pointSize
+            )
+        }
+        if self == .system {
+            return NSFont.systemFont(ofSize: pointSize, weight: weight.nsWeight)
+        }
+        if let familyName = installedFamilyName {
+            let descriptor = NSFontDescriptor(fontAttributes: [
+                .family: familyName,
+                .traits: [NSFontDescriptor.TraitKey.weight: weight.nsWeight.rawValue]
+            ])
+            if let font = NSFont(descriptor: descriptor, size: pointSize) {
+                return font
+            }
+            if let named = NSFont(name: familyName, size: pointSize) {
+                return named
+            }
+        }
+        return NSFont.systemFont(ofSize: pointSize, weight: weight.nsWeight)
+    }
+
+    private static func supportsClockDigits(familyName: String) -> Bool {
+        let descriptor = NSFontDescriptor(fontAttributes: [.family: familyName])
+        guard let font = NSFont(descriptor: descriptor, size: 24) else { return false }
+        var characters = Array("0123456789".utf16)
+        var glyphs = [CGGlyph](repeating: 0, count: characters.count)
+        let ok = CTFontGetGlyphsForCharacters(font as CTFont, &characters, &glyphs, characters.count)
+        return ok && glyphs.allSatisfy { $0 != 0 }
+    }
+
+    private static func migrateLegacyRawValue(_ raw: String) -> String {
+        switch raw {
+        case "helveticaNeue":
+            return installed("Helvetica Neue").rawValue
+        case "sfPro":
+            return installed("SF Pro").rawValue
+        case "sfCompact":
+            return installed("SF Compact").rawValue
+        default:
+            return raw
         }
     }
 }
@@ -39,6 +142,18 @@ enum ClockFontWeight: String, CaseIterable {
         case .bold: return .bold
         }
     }
+
+    /// Approximate mapping onto Apple's 0…1000 lock-screen weight scale.
+    var systemWeightValue: Int {
+        switch self {
+        case .thin: return 200
+        case .light: return 300
+        case .regular: return 400
+        case .medium: return 500
+        case .semibold: return 600
+        case .bold: return 700
+        }
+    }
 }
 
 struct ClockPlacement: Equatable {
@@ -57,36 +172,41 @@ struct ClockAppearance: Equatable {
     var showSeconds: Bool
     var placement: ClockPlacement
     var skyLightSpaceLevel: Int32
+    var backdropBlur: Bool
+    var matchSystemClock: Bool
+    /// Populated when `matchSystemClock` is resolved for rendering; not persisted.
+    var systemFontIdentifier: String?
+    var systemFontWeight: Int?
 
     static let `default` = ClockAppearance(
         family: .system,
         weight: .regular,
-        size: 125,
+        size: SystemClockLayout.defaultTimePointSize,
         color: NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 1),
         opacity: 0.70,
         showSeconds: false,
-        placement: ClockPlacement(horizontalFraction: 0.50, verticalFraction: 0.20),
-        skyLightSpaceLevel: 400
+        placement: SystemClockLayout.defaultAppearancePlacement,
+        skyLightSpaceLevel: 400,
+        backdropBlur: false,
+        matchSystemClock: true,
+        systemFontIdentifier: nil,
+        systemFontWeight: nil
     )
+
+    func resolved(on screen: NSScreen) -> ClockAppearance {
+        AppleLockScreenClock.matchedAppearance(from: self, on: screen)
+    }
 
     func makeFont(pointSize: CGFloat? = nil) -> NSFont {
         let pointSize = pointSize ?? size
-        let fallback = NSFont.systemFont(ofSize: pointSize, weight: weight.nsWeight)
-        let named: NSFont?
-        switch family {
-        case .system:
-            return fallback
-        case .helveticaNeue:
-            named = NSFont(name: "Helvetica Neue", size: pointSize)
-        case .sfPro:
-            named = NSFont(name: "SF Pro Display", size: pointSize) ?? NSFont(name: "SF Pro", size: pointSize)
-        case .sfCompact:
-            named = NSFont(name: "SF Compact Display", size: pointSize) ?? NSFont(name: "SF Compact", size: pointSize)
+        if matchSystemClock, let prefs = AppleLockScreenClock.readPreferences() {
+            return AppleLockScreenClock.makeSystemFont(
+                identifier: prefs.fontIdentifier,
+                weight: prefs.fontWeight,
+                pointSize: pointSize
+            )
         }
-        guard let named else { return fallback }
-        let traits: [NSFontDescriptor.TraitKey: Any] = [.weight: weight.nsWeight.rawValue]
-        let descriptor = named.fontDescriptor.addingAttributes([.traits: traits])
-        return NSFont(descriptor: descriptor, size: pointSize) ?? named
+        return family.makeFont(weight: weight, pointSize: pointSize)
     }
 }
 
@@ -113,20 +233,6 @@ final class Settings {
         set { defaults.set(newValue, forKey: Keys.debugShowClockWhileUnlocked) }
     }
 
-    var hasAutoRegisteredLoginItem: Bool {
-        get { defaults.bool(forKey: Keys.loginItemAutoRegistered) }
-        set { defaults.set(newValue, forKey: Keys.loginItemAutoRegistered) }
-    }
-
-    /// When false the app stays running but never shows the lock-screen clock.
-    var clockEnabled: Bool {
-        get {
-            if defaults.object(forKey: Keys.clockEnabled) == nil { return true }
-            return defaults.bool(forKey: Keys.clockEnabled)
-        }
-        set { defaults.set(newValue, forKey: Keys.clockEnabled) }
-    }
-
     var appearance: ClockAppearance {
         get { loadAppearance() }
         set { saveAppearance(newValue) }
@@ -140,8 +246,6 @@ final class Settings {
         static let debugMode = "debugMode"
         static let debugLogging = "debugLogging"
         static let debugShowClockWhileUnlocked = "debugShowClockWhileUnlocked"
-        static let loginItemAutoRegistered = "loginItemAutoRegistered"
-        static let clockEnabled = "clock.enabled"
         static let fontFamily = "clock.fontFamily"
         static let fontWeight = "clock.fontWeight"
         static let fontSize = "clock.fontSize"
@@ -153,12 +257,16 @@ final class Settings {
         static let horizontalFraction = "clock.horizontalFraction"
         static let verticalFraction = "clock.verticalFraction"
         static let skyLightSpaceLevel = "clock.skyLightSpaceLevel"
+        static let backdropBlur = "clock.backdropBlur"
+        static let matchSystemClock = "clock.matchSystemClock"
     }
 
     private init() {}
 
     static var shouldOpenSettingsOnLaunch: Bool {
-        ProcessInfo.processInfo.arguments.contains("--settings")
+        if ProcessInfo.processInfo.arguments.contains("--settings") { return true }
+        if isDebugMode { return false }
+        return !LaunchAtLogin.isEnabled
     }
 
     func notifyChange() {
@@ -168,9 +276,8 @@ final class Settings {
 
     private func loadAppearance() -> ClockAppearance {
         var appearance = ClockAppearance.default
-        if let raw = defaults.string(forKey: Keys.fontFamily),
-           let family = ClockFontFamily(rawValue: raw) {
-            appearance.family = family
+        if let raw = defaults.string(forKey: Keys.fontFamily) {
+            appearance.family = ClockFontFamily(rawValue: raw)
         }
         if let raw = defaults.string(forKey: Keys.fontWeight),
            let weight = ClockFontWeight(rawValue: raw) {
@@ -183,6 +290,12 @@ final class Settings {
             appearance.opacity = CGFloat(defaults.double(forKey: Keys.opacity))
         }
         appearance.showSeconds = defaults.bool(forKey: Keys.showSeconds)
+        if defaults.object(forKey: Keys.backdropBlur) != nil {
+            appearance.backdropBlur = defaults.bool(forKey: Keys.backdropBlur)
+        }
+        if defaults.object(forKey: Keys.matchSystemClock) != nil {
+            appearance.matchSystemClock = defaults.bool(forKey: Keys.matchSystemClock)
+        }
         if defaults.object(forKey: Keys.horizontalFraction) != nil {
             appearance.placement.horizontalFraction = CGFloat(defaults.double(forKey: Keys.horizontalFraction))
         }
@@ -209,6 +322,8 @@ final class Settings {
         defaults.set(Double(appearance.size), forKey: Keys.fontSize)
         defaults.set(Double(appearance.opacity), forKey: Keys.opacity)
         defaults.set(appearance.showSeconds, forKey: Keys.showSeconds)
+        defaults.set(appearance.backdropBlur, forKey: Keys.backdropBlur)
+        defaults.set(appearance.matchSystemClock, forKey: Keys.matchSystemClock)
         defaults.set(Double(appearance.placement.horizontalFraction), forKey: Keys.horizontalFraction)
         defaults.set(Double(appearance.placement.verticalFraction), forKey: Keys.verticalFraction)
         defaults.set(Int(appearance.skyLightSpaceLevel), forKey: Keys.skyLightSpaceLevel)

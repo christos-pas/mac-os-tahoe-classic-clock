@@ -2,7 +2,6 @@ import AppKit
 import SwiftUI
 
 final class SettingsModel: ObservableObject {
-    @Published var clockEnabled: Bool
     @Published var launchAtLogin: Bool
     @Published var family: ClockFontFamily
     @Published var weight: ClockFontWeight
@@ -10,6 +9,8 @@ final class SettingsModel: ObservableObject {
     @Published var colorPosition: Double
     @Published var opacity: Double
     @Published var showSeconds: Bool
+    @Published var backdropBlur: Bool
+    @Published var matchSystemClock: Bool
     @Published var horizontalFraction: Double
     @Published var verticalFraction: Double
 
@@ -18,7 +19,6 @@ final class SettingsModel: ObservableObject {
 
     init() {
         let appearance = Settings.shared.appearance
-        clockEnabled = Settings.shared.clockEnabled
         launchAtLogin = LaunchAtLogin.isEnabled
         family = appearance.family
         weight = appearance.weight
@@ -26,6 +26,8 @@ final class SettingsModel: ObservableObject {
         colorPosition = ColorSpectrum.position(for: appearance.color)
         opacity = Double(appearance.opacity)
         showSeconds = appearance.showSeconds
+        backdropBlur = appearance.backdropBlur
+        matchSystemClock = appearance.matchSystemClock
         horizontalFraction = Double(appearance.placement.horizontalFraction)
         verticalFraction = Double(appearance.placement.verticalFraction)
     }
@@ -33,7 +35,6 @@ final class SettingsModel: ObservableObject {
     func reloadFromDefaults() {
         suppressPersist = true
         let appearance = Settings.shared.appearance
-        clockEnabled = Settings.shared.clockEnabled
         launchAtLogin = LaunchAtLogin.isEnabled
         family = appearance.family
         weight = appearance.weight
@@ -41,6 +42,8 @@ final class SettingsModel: ObservableObject {
         colorPosition = ColorSpectrum.position(for: appearance.color)
         opacity = Double(appearance.opacity)
         showSeconds = appearance.showSeconds
+        backdropBlur = appearance.backdropBlur
+        matchSystemClock = appearance.matchSystemClock
         horizontalFraction = Double(appearance.placement.horizontalFraction)
         verticalFraction = Double(appearance.placement.verticalFraction)
         suppressPersist = false
@@ -56,16 +59,16 @@ final class SettingsModel: ObservableObject {
         appearance.color = ColorSpectrum.nsColor(at: colorPosition)
         appearance.opacity = CGFloat(opacity)
         appearance.showSeconds = showSeconds
+        appearance.backdropBlur = backdropBlur
+        appearance.matchSystemClock = matchSystemClock
         appearance.placement.horizontalFraction = CGFloat(horizontalFraction)
         appearance.placement.verticalFraction = CGFloat(verticalFraction)
 
-        let enabledChanged = Settings.shared.clockEnabled != clockEnabled
         let loginChanged = LaunchAtLogin.isEnabled != launchAtLogin
         let appearanceChanged = !Self.sameAppearance(Settings.shared.appearance, appearance)
-        guard enabledChanged || loginChanged || appearanceChanged else { return }
+        guard loginChanged || appearanceChanged else { return }
 
         isWriting = true
-        Settings.shared.clockEnabled = clockEnabled
         LaunchAtLogin.setEnabled(launchAtLogin)
         Settings.shared.appearance = appearance
         Settings.shared.notifyChange()
@@ -75,13 +78,14 @@ final class SettingsModel: ObservableObject {
     func resetToDefaults() {
         suppressPersist = true
         let appearance = ClockAppearance.default
-        clockEnabled = true
         family = appearance.family
         weight = appearance.weight
         size = Double(appearance.size)
         colorPosition = ColorSpectrum.position(for: appearance.color)
         opacity = Double(appearance.opacity)
         showSeconds = appearance.showSeconds
+        backdropBlur = appearance.backdropBlur
+        matchSystemClock = appearance.matchSystemClock
         horizontalFraction = Double(appearance.placement.horizontalFraction)
         verticalFraction = Double(appearance.placement.verticalFraction)
         suppressPersist = false
@@ -94,6 +98,8 @@ final class SettingsModel: ObservableObject {
             && abs(lhs.size - rhs.size) < 0.5
             && abs(lhs.opacity - rhs.opacity) < 0.01
             && lhs.showSeconds == rhs.showSeconds
+            && lhs.backdropBlur == rhs.backdropBlur
+            && lhs.matchSystemClock == rhs.matchSystemClock
             && abs(lhs.placement.horizontalFraction - rhs.placement.horizontalFraction) < 0.001
             && abs(lhs.placement.verticalFraction - rhs.placement.verticalFraction) < 0.001
             && colorsMatch(lhs.color, rhs.color)
@@ -115,9 +121,14 @@ final class SettingsModel: ObservableObject {
         appearance.color = ColorSpectrum.nsColor(at: colorPosition)
         appearance.opacity = CGFloat(opacity)
         appearance.showSeconds = showSeconds
+        appearance.backdropBlur = backdropBlur
+        appearance.matchSystemClock = matchSystemClock
         appearance.placement.horizontalFraction = CGFloat(horizontalFraction)
         appearance.placement.verticalFraction = CGFloat(verticalFraction)
-        return appearance
+        guard matchSystemClock, let screen = NSScreen.main ?? NSScreen.screens.first else {
+            return appearance
+        }
+        return appearance.resolved(on: screen)
     }
 }
 
@@ -187,6 +198,8 @@ enum ColorSpectrum {
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     @State private var confirmReset = false
+    @State private var showAppleClockAlert = false
+    @State private var appleLargeClockOn = AppleLockScreenClock.isLargeClockEnabled
     @State private var wallpaper: NSImage?
 
     var body: some View {
@@ -204,11 +217,35 @@ struct SettingsView: View {
                 model.resetToDefaults()
             }
         } message: {
-            Text("Restore the default font, size, color, opacity, and position? Open at Login is not changed.")
+            Text("Restore the default font, size, color, opacity, and position? Launch at Login is not changed.")
+        }
+        .alert("Turn Off Apple's Lock Screen Clock", isPresented: $showAppleClockAlert) {
+            Button("Open System Settings") {
+                AppleLockScreenClock.openClockAppearanceSettings()
+            }
+            Button("Enable Anyway") {
+                model.launchAtLogin = true
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                """
+                Apple’s large Lock Screen clock is still on. In System Settings → Wallpaper → Clock Appearance, set Show large clock to Never. Then run sudo diskutil apfs updatePreboot / in Terminal and restart so the change applies everywhere (FileVault, boot, and wake).
+                """
+            )
         }
         .onAppear {
+            refreshAppleClockState()
             WallpaperImage.startWatching()
             wallpaper = WallpaperImage.current()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshAppleClockState()
+            Settings.shared.notifyChange()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AppleLockScreenClock.preferencesDidChangeNotification)) { _ in
+            refreshAppleClockState()
+            Settings.shared.notifyChange()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
             wallpaper = WallpaperImage.current()
@@ -216,7 +253,6 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: WallpaperImage.didChangeNotification)) { _ in
             wallpaper = WallpaperImage.current()
         }
-        .onChange(of: model.clockEnabled) { _, _ in model.persist() }
         .onChange(of: model.launchAtLogin) { _, _ in model.persist() }
         .onChange(of: model.family) { _, _ in model.persist() }
         .onChange(of: model.weight) { _, _ in model.persist() }
@@ -224,29 +260,89 @@ struct SettingsView: View {
         .onChange(of: model.colorPosition) { _, _ in model.persist() }
         .onChange(of: model.opacity) { _, _ in model.persist() }
         .onChange(of: model.showSeconds) { _, _ in model.persist() }
+        .onChange(of: model.backdropBlur) { _, _ in model.persist() }
+        .onChange(of: model.matchSystemClock) { _, _ in model.persist() }
         .onChange(of: model.horizontalFraction) { _, _ in model.persist() }
         .onChange(of: model.verticalFraction) { _, _ in model.persist() }
     }
 
     private var leftPanel: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Toggle("Show Lock Screen Clock", isOn: $model.clockEnabled)
-            Toggle("Open at Login", isOn: $model.launchAtLogin)
+            Toggle(
+                "Enable Classic Lock Screen Clock (Launch at Login)",
+                isOn: enableToggleBinding
+            )
+            appleClockSection
             LockScreenPreview(
                 appearance: model.liveAppearance,
-                enabled: model.clockEnabled,
+                enabled: model.launchAtLogin,
                 wallpaper: wallpaper
             )
             Spacer(minLength: 0)
         }
     }
 
+    private var enableToggleBinding: Binding<Bool> {
+        Binding(
+            get: { model.launchAtLogin },
+            set: { newValue in
+                if newValue, !model.matchSystemClock, AppleLockScreenClock.isLargeClockEnabled {
+                    showAppleClockAlert = true
+                    return
+                }
+                model.launchAtLogin = newValue
+            }
+        )
+    }
+
+    private var appleClockSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if appleLargeClockOn, !model.matchSystemClock {
+                Label {
+                    Text("Apple's large Lock Screen clock is on. Turn it off, or enable Match System Clock to draw on top.")
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                }
+                .font(.callout)
+                .foregroundStyle(.orange)
+            } else if model.matchSystemClock {
+                Text("Match System Clock draws a solid clock aligned with Apple's. Apple's clock can stay on underneath.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            if model.matchSystemClock {
+                Text("System clock: \(AppleLockScreenClock.systemFontSummary())")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Button("Open Clock Appearance in System Settings…") {
+                AppleLockScreenClock.openClockAppearanceSettings()
+            }
+            .controlSize(.small)
+        }
+    }
+
+    private func refreshAppleClockState() {
+        appleLargeClockOn = AppleLockScreenClock.isLargeClockEnabled
+    }
+
     private var rightPanel: some View {
         Form {
             Section("Type") {
                 Picker("Font", selection: $model.family) {
-                    ForEach(ClockFontFamily.allCases, id: \.self) { family in
-                        Text(family.displayName).tag(family)
+                    ForEach(ClockFontFamily.lockScreenMenuItems, id: \.self) { family in
+                        Text(family.displayName)
+                            .font(Font(family.previewFont()))
+                            .tag(family)
+                    }
+                    Divider()
+                    Text(ClockFontFamily.system.displayName)
+                        .font(Font(ClockFontFamily.system.previewFont()))
+                        .tag(ClockFontFamily.system)
+                    ForEach(ClockFontFamily.installedMenuItems, id: \.self) { family in
+                        Text(family.displayName)
+                            .font(Font(family.previewFont()))
+                            .tag(family)
                     }
                 }
                 Picker("Weight", selection: $model.weight) {
@@ -256,23 +352,31 @@ struct SettingsView: View {
                 }
                 Toggle("Show seconds", isOn: $model.showSeconds)
             }
-            .disabled(!model.clockEnabled)
+            .disabled(!model.launchAtLogin || model.matchSystemClock)
+
+            Section("System") {
+                Toggle("Match System Clock", isOn: $model.matchSystemClock)
+                if model.matchSystemClock {
+                    Text("Uses font, weight, size, and position from Clock Appearance in System Settings. Drawn solid white on top of Apple's clock.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .disabled(!model.launchAtLogin)
 
             Section("Look") {
                 ColorTrackSlider(position: $model.colorPosition)
                 slider("Size", value: $model.size, range: 60...240, format: "%.0f")
                 slider("Opacity", value: $model.opacity, range: 0.2...1, format: "%.2f")
+                Toggle("Backdrop blur (experimental)", isOn: $model.backdropBlur)
             }
-            .disabled(!model.clockEnabled)
+            .disabled(!model.launchAtLogin || model.matchSystemClock)
 
             Section("Position") {
                 slider("Horizontal", value: $model.horizontalFraction, range: 0...1, format: "%.2f")
                 slider("Vertical", value: $model.verticalFraction, range: 0...1, format: "%.2f")
-                Text("Horizontal 0.5 is centered. Vertical is measured from the top of the screen.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
             }
-            .disabled(!model.clockEnabled)
+            .disabled(!model.launchAtLogin || model.matchSystemClock)
 
             Section {
                 Button("Set Defaults…") {
@@ -346,6 +450,8 @@ struct LockScreenPreview: View {
     var enabled: Bool
     var wallpaper: NSImage?
 
+    @State private var clockSize: CGSize?
+
     private var screenFrame: NSRect {
         (NSScreen.main ?? NSScreen.screens.first)?.frame ?? NSRect(x: 0, y: 0, width: 1512, height: 982)
     }
@@ -360,11 +466,27 @@ struct LockScreenPreview: View {
             let scale = geometry.size.width / max(screenFrame.width, 1)
             ZStack {
                 previewBackground
-                ClockView(appearance: appearance, scale: scale)
-                    .opacity(enabled ? 1 : 0.35)
-                    .position(
-                        x: geometry.size.width * appearance.placement.horizontalFraction,
-                        y: geometry.size.height * appearance.placement.verticalFraction
+                if let clockSize {
+                    ClockView(appearance: appearance, scale: scale, usesWindowBackdrop: false)
+                        .opacity(enabled ? 1 : 0.35)
+                        .position(
+                            SystemClockLayout.previewCenter(
+                                viewSize: clockSize,
+                                appearance: appearance,
+                                previewSize: geometry.size,
+                                screenHeight: screenFrame.height
+                            )
+                        )
+                }
+                ClockView(appearance: appearance, scale: scale, usesWindowBackdrop: false)
+                    .fixedSize()
+                    .hidden()
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear
+                                .onAppear { clockSize = proxy.size }
+                                .onChange(of: proxy.size) { _, size in clockSize = size }
+                        }
                     )
             }
         }

@@ -85,7 +85,7 @@ final class DiagnosticsWindowController: NSWindowController, NSWindowDelegate {
         \(snapshot)
         """
         loginItemButton.title = LaunchAtLogin.isEnabled ? "Disable Launch at Login" : "Enable Launch at Login"
-        familyPopup.selectItem(withTitle: appearance.family.displayName)
+        selectFamily(appearance.family)
         weightPopup.selectItem(withTitle: appearance.weight.displayName)
         secondsCheckbox.state = appearance.showSeconds ? .on : .off
         sizeSlider.doubleValue = Double(appearance.size)
@@ -117,7 +117,7 @@ final class DiagnosticsWindowController: NSWindowController, NSWindowDelegate {
         textView.textContainer?.containerSize = NSSize(width: 600, height: CGFloat.greatestFiniteMagnitude)
         textView.textContainer?.widthTracksTextView = true
 
-        familyPopup.addItems(withTitles: ClockFontFamily.allCases.map(\.displayName))
+        rebuildFamilyPopup()
         weightPopup.addItems(withTitles: ClockFontWeight.allCases.map(\.displayName))
         familyPopup.target = self
         familyPopup.action = #selector(appearanceChanged)
@@ -180,6 +180,40 @@ final class DiagnosticsWindowController: NSWindowController, NSWindowDelegate {
         ])
     }
 
+    private func selectFamily(_ family: ClockFontFamily) {
+        guard let menu = familyPopup.menu else { return }
+        if let index = menu.items.firstIndex(where: { ($0.representedObject as? String) == family.rawValue }) {
+            familyPopup.selectItem(at: index)
+        }
+    }
+
+    private func rebuildFamilyPopup() {
+        familyPopup.removeAllItems()
+        guard let menu = familyPopup.menu else { return }
+
+        func append(_ family: ClockFontFamily) {
+            let item = NSMenuItem(title: family.displayName, action: nil, keyEquivalent: "")
+            item.attributedTitle = NSAttributedString(
+                string: family.displayName,
+                attributes: [
+                    .font: family.previewFont(size: 13),
+                    .foregroundColor: NSColor.labelColor
+                ]
+            )
+            item.representedObject = family.rawValue
+            menu.addItem(item)
+        }
+
+        for family in ClockFontFamily.lockScreenMenuItems {
+            append(family)
+        }
+        menu.addItem(.separator())
+        append(.system)
+        for family in ClockFontFamily.installedMenuItems {
+            append(family)
+        }
+    }
+
     private func configure(_ slider: NSSlider, min: Double, max: Double) {
         slider.minValue = min
         slider.maxValue = max
@@ -214,8 +248,14 @@ final class DiagnosticsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func appearanceChanged() {
         var appearance = Settings.shared.appearance
-        if let family = ClockFontFamily.allCases.first(where: { $0.displayName == familyPopup.titleOfSelectedItem }) {
-            appearance.family = family
+        if let raw = familyPopup.selectedItem?.representedObject as? String {
+            appearance.family = ClockFontFamily(rawValue: raw)
+        } else if let title = familyPopup.titleOfSelectedItem {
+            let match = (ClockFontFamily.lockScreenMenuItems + [.system] + ClockFontFamily.installedMenuItems)
+                .first { $0.displayName == title }
+            if let match {
+                appearance.family = match
+            }
         }
         if let weight = ClockFontWeight.allCases.first(where: { $0.displayName == weightPopup.titleOfSelectedItem }) {
             appearance.weight = weight

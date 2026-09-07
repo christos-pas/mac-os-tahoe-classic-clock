@@ -63,17 +63,26 @@ export SHELL_LIB
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build diagnostics settings install uninstall dist
+.PHONY: help build diagnostics settings install uninstall dist release screenshots calibrate icon logo
 
 help:
-	@echo "Lock Clock $(MARKETING_VERSION) (build $(CURRENT_PROJECT_VERSION))"
+	@echo "Lock Clock $(MAJOR).$(MINOR).$(BUILD)"
 	@echo
 	@echo "  make build         Build $(APP_NAME).app (Release)"
 	@echo "  make dist          Bump build number and write an unsigned zip to dist/"
+	@echo "  make screenshots   Render Settings / lock-screen / menu PNGs"
+	@echo "  make calibrate     Render + measure against a reference lock-screen PNG"
+	@echo "  make icon          Render the app icon into Assets.xcassets and rebuild"
+	@echo "  make logo          Alias for make icon"
+	@echo "  make release       Dist + publish a GitHub release"
 	@echo "  make diagnostics   Launch the built app with the debug window"
 	@echo "  make settings      Launch the built app and open Settings"
 	@echo "  make install       Copy the built app to $(DEST_APP)"
 	@echo "  make uninstall     Remove this app, its login item, and its defaults"
+	@echo
+	@echo "Release notes (make cannot take a --notes flag):"
+	@echo "  make release NOTES=\"What changed\""
+	@echo "  ./scripts/release.sh --notes \"What changed\""
 	@echo
 	@echo "Install location can be overridden:"
 	@echo "  make install PREFIX=\"$$HOME/Applications\""
@@ -87,28 +96,32 @@ build:
 		-scheme "$(SCHEME)" \
 		-configuration "$(CONFIGURATION)" \
 		-derivedDataPath "$(DERIVED_DATA)" \
-		MARKETING_VERSION="$(MARKETING_VERSION)" \
-		CURRENT_PROJECT_VERSION="$(CURRENT_PROJECT_VERSION)" \
+		MARKETING_VERSION="$(MAJOR).$(MINOR).$(BUILD)" \
+		CURRENT_PROJECT_VERSION="$(BUILD)" \
 		build
 	@mkdir -p "$(DERIVED_DATA)"
 	@touch "$(DERIVED_DATA)/.metadata_never_index"
-	@echo "Built $(BUILT_APP) ($(MARKETING_VERSION) build $(CURRENT_PROJECT_VERSION))"
+	@echo "Built $(BUILT_APP) ($(MAJOR).$(MINOR).$(BUILD))"
 
 dist:
 	@test -d "$(PROJECT)" || { echo "error: run this from the Lock Clock repo root"; exit 1; }
 	@eval "$$SHELL_LIB"; \
-	next=$$(($(CURRENT_PROJECT_VERSION) + 1)); \
+	next=$$(($(BUILD) + 1)); \
+	version="$(MAJOR).$(MINOR).$$next"; \
 	{ \
-		echo "MARKETING_VERSION = $(MARKETING_VERSION)"; \
-		echo "CURRENT_PROJECT_VERSION = $$next"; \
+		echo "MAJOR = $(MAJOR)"; \
+		echo "MINOR = $(MINOR)"; \
+		echo "BUILD = $$next"; \
+		echo 'MARKETING_VERSION = $$(MAJOR).$$(MINOR).$$(BUILD)'; \
+		echo 'CURRENT_PROJECT_VERSION = $$(BUILD)'; \
 	} > "$(VERSION_FILE)"; \
-	echo "Build number $(CURRENT_PROJECT_VERSION) → $$next"; \
+	echo "Version $(MAJOR).$(MINOR).$(BUILD) → $$version"; \
 	xcodebuild \
 		-project "$(PROJECT)" \
 		-scheme "$(SCHEME)" \
 		-configuration "$(CONFIGURATION)" \
 		-derivedDataPath "$(DERIVED_DATA)" \
-		MARKETING_VERSION="$(MARKETING_VERSION)" \
+		MARKETING_VERSION="$$version" \
 		CURRENT_PROJECT_VERSION="$$next" \
 		build || exit 1; \
 	mkdir -p "$(DERIVED_DATA)"; \
@@ -117,11 +130,38 @@ dist:
 	xattr -cr "$(BUILT_APP)" 2>/dev/null || true; \
 	codesign --force --deep --sign - "$(BUILT_APP)"; \
 	mkdir -p "$(DIST_DIR)"; \
-	zip_path="$(DIST_DIR)/$(APP_NAME)-$(MARKETING_VERSION)-$$next.zip"; \
+	zip_path="$(DIST_DIR)/$(APP_NAME)-$$version.zip"; \
 	rm -f -- "$$zip_path"; \
 	ditto -c -k --keepParent --sequesterRsrc "$(BUILT_APP)" "$$zip_path"; \
 	echo "Wrote $$zip_path"; \
 	echo "This zip is ad-hoc signed and not notarized. macOS Gatekeeper will warn people who download it."
+
+screenshots: build
+	@mkdir -p "$(CURDIR)/docs/screenshots"
+	"$(BUILT_APP)/Contents/MacOS/$(APP_NAME)" --export-screenshots "$(CURDIR)/docs/screenshots"
+
+CALIBRATION_REF ?= $(HOME)/Desktop/system_clock.png
+
+calibrate: build
+	@mkdir -p "$(CURDIR)/docs/calibration"
+	"$(BUILT_APP)/Contents/MacOS/$(APP_NAME)" --calibrate-clock "$(CALIBRATION_REF)" "$(CURDIR)/docs/calibration"
+
+icon: build
+	"$(BUILT_APP)/Contents/MacOS/$(APP_NAME)" --export-icon "$(CURDIR)/LockClock/Assets.xcassets/AppIcon.appiconset"
+	xcodebuild \
+		-project "$(PROJECT)" \
+		-scheme "$(SCHEME)" \
+		-configuration "$(CONFIGURATION)" \
+		-derivedDataPath "$(DERIVED_DATA)" \
+		MARKETING_VERSION="$(MAJOR).$(MINOR).$(BUILD)" \
+		CURRENT_PROJECT_VERSION="$(BUILD)" \
+		build
+	@echo "Icon baked into $(BUILT_APP)"
+
+logo: icon
+
+release:
+	@NOTES="$(NOTES)" "$(CURDIR)/scripts/release.sh"
 
 diagnostics: build
 	@eval "$$SHELL_LIB"; quit_ours
@@ -140,6 +180,8 @@ install: build
 	mkdir -p "$(PREFIX)"; \
 	ditto -- "$(BUILT_APP)" "$(DEST_APP)"; \
 	is_our_app "$(DEST_APP)" || exit 1; \
+	touch "$(DEST_APP)"; \
+	/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f -R -trusted "$(DEST_APP)" >/dev/null 2>&1 || true; \
 	echo "Installed $(DEST_APP)"; \
 	echo "Launch it from $(PREFIX) when you want it to run. First normal launch may register Launch at Login for this app only."
 

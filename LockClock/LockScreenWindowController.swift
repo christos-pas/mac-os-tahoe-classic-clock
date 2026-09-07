@@ -55,15 +55,49 @@ final class LockScreenWindowController: NSWindowController {
 
     func applyAppearance(_ appearance: ClockAppearance, on screen: NSScreen) {
         screenName = screen.localizedName
-        let view = ClockView(appearance: appearance)
+        let resolved = appearance.resolved(on: screen)
+
+        let measureHosting = NSHostingView(rootView: ClockView(appearance: resolved))
+        measureHosting.layoutSubtreeIfNeeded()
+        let size = measureHosting.fittingSize
+        let frame = SystemClockLayout.windowFrame(
+            viewSize: size,
+            appearance: resolved,
+            on: screen
+        )
+        window?.setFrame(frame, display: true)
+
+        let context = backdropContext(
+            for: resolved,
+            on: screen,
+            windowFrame: window?.frame ?? frame
+        )
+        let view = ClockView(appearance: resolved, backdropContext: context)
         let hosting = NSHostingView(rootView: view)
         hosting.safeAreaRegions = []
+        hosting.wantsLayer = true
+        if resolved.backdropBlur {
+            hosting.layer?.backgroundColor = NSColor.clear.cgColor
+        }
         window?.contentView = hosting
         hostingView = hosting
-        hosting.layoutSubtreeIfNeeded()
-        let size = hosting.fittingSize
-        let frame = Self.frame(for: size, placement: appearance.placement, clockSize: appearance.size, on: screen)
-        window?.setFrame(frame, display: true)
+    }
+
+    private func backdropContext(
+        for appearance: ClockAppearance,
+        on screen: NSScreen,
+        windowFrame: NSRect?
+    ) -> ClockBackdropContext? {
+        guard appearance.backdropBlur, let windowFrame else { return nil }
+        guard let wallpaper = WallpaperImage.current(for: screen) else {
+            LockClockLog.info("Backdrop blur: no lock-screen wallpaper for \(screen.localizedName)")
+            return nil
+        }
+        return ClockBackdropContext(
+            wallpaper: wallpaper,
+            screenFrame: screen.frame,
+            windowFrame: windowFrame
+        )
     }
 
     func show(using manager: SystemWindowManager, on screen: NSScreen) {
@@ -88,22 +122,6 @@ final class LockScreenWindowController: NSWindowController {
     var diagnosticLevel: String {
         guard let window else { return "none" }
         return String(window.level.rawValue)
-    }
-
-    private static func frame(
-        for size: NSSize,
-        placement: ClockPlacement,
-        clockSize: CGFloat,
-        on screen: NSScreen
-    ) -> NSRect {
-        let width = max(size.width, 80)
-        let height = max(size.height, 40)
-        let x = screen.frame.minX + screen.frame.width * placement.horizontalFraction - width / 2
-        let yFromTop = screen.frame.height * placement.verticalFraction
-        // Keep the time centered on the configured point; the date sits above it.
-        let dateOffset = clockSize * 0.15
-        let y = screen.frame.maxY - yFromTop - height / 2 + dateOffset
-        return NSRect(x: x, y: y, width: width, height: height)
     }
 }
 

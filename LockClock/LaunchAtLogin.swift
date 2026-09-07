@@ -25,14 +25,4 @@ enum LaunchAtLogin {
             LockClockLog.error("Launch at login failed: \(error.localizedDescription)")
         }
     }
-
-    static func registerIfNeeded() {
-        if Settings.isDebugMode {
-            LockClockLog.info("Debug mode: skipping automatic Launch at Login registration")
-            return
-        }
-        guard !Settings.shared.hasAutoRegisteredLoginItem else { return }
-        setEnabled(true)
-        Settings.shared.hasAutoRegisteredLoginItem = true
-    }
 }
