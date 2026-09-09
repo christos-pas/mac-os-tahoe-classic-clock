@@ -5,7 +5,6 @@ final class DisplayManager {
     private let windowManager: SystemWindowManager
     private(set) var isShowing = false
     private var screenObserver: NSObjectProtocol?
-    private var wallpaperObserver: NSObjectProtocol?
     private var systemClockObserver: NSObjectProtocol?
     private var activeObserver: NSObjectProtocol?
 
@@ -20,14 +19,6 @@ final class DisplayManager {
             queue: .main
         ) { [weak self] _ in
             self?.handleScreenChange()
-        }
-        wallpaperObserver = NotificationCenter.default.addObserver(
-            forName: WallpaperImage.didChangeNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            WallpaperBackdropBlur.clearCache()
-            self?.refreshAppearance()
         }
         systemClockObserver = NotificationCenter.default.addObserver(
             forName: AppleLockScreenClock.preferencesDidChangeNotification,
@@ -49,9 +40,6 @@ final class DisplayManager {
     func stop() {
         if let screenObserver {
             NotificationCenter.default.removeObserver(screenObserver)
-        }
-        if let wallpaperObserver {
-            NotificationCenter.default.removeObserver(wallpaperObserver)
         }
         if let systemClockObserver {
             NotificationCenter.default.removeObserver(systemClockObserver)

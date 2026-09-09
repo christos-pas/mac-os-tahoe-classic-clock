@@ -172,7 +172,6 @@ struct ClockAppearance: Equatable {
     var showSeconds: Bool
     var placement: ClockPlacement
     var skyLightSpaceLevel: Int32
-    var backdropBlur: Bool
     var matchSystemClock: Bool
     /// Populated when `matchSystemClock` is resolved for rendering; not persisted.
     var systemFontIdentifier: String?
@@ -187,7 +186,6 @@ struct ClockAppearance: Equatable {
         showSeconds: false,
         placement: SystemClockLayout.defaultAppearancePlacement,
         skyLightSpaceLevel: 400,
-        backdropBlur: false,
         matchSystemClock: true,
         systemFontIdentifier: nil,
         systemFontWeight: nil
@@ -257,7 +255,6 @@ final class Settings {
         static let horizontalFraction = "clock.horizontalFraction"
         static let verticalFraction = "clock.verticalFraction"
         static let skyLightSpaceLevel = "clock.skyLightSpaceLevel"
-        static let backdropBlur = "clock.backdropBlur"
         static let matchSystemClock = "clock.matchSystemClock"
     }
 
@@ -290,9 +287,6 @@ final class Settings {
             appearance.opacity = CGFloat(defaults.double(forKey: Keys.opacity))
         }
         appearance.showSeconds = defaults.bool(forKey: Keys.showSeconds)
-        if defaults.object(forKey: Keys.backdropBlur) != nil {
-            appearance.backdropBlur = defaults.bool(forKey: Keys.backdropBlur)
-        }
         if defaults.object(forKey: Keys.matchSystemClock) != nil {
             appearance.matchSystemClock = defaults.bool(forKey: Keys.matchSystemClock)
         }
@@ -322,7 +316,6 @@ final class Settings {
         defaults.set(Double(appearance.size), forKey: Keys.fontSize)
         defaults.set(Double(appearance.opacity), forKey: Keys.opacity)
         defaults.set(appearance.showSeconds, forKey: Keys.showSeconds)
-        defaults.set(appearance.backdropBlur, forKey: Keys.backdropBlur)
         defaults.set(appearance.matchSystemClock, forKey: Keys.matchSystemClock)
         defaults.set(Double(appearance.placement.horizontalFraction), forKey: Keys.horizontalFraction)
         defaults.set(Double(appearance.placement.verticalFraction), forKey: Keys.verticalFraction)

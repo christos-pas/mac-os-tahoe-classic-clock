@@ -67,37 +67,12 @@ final class LockScreenWindowController: NSWindowController {
         )
         window?.setFrame(frame, display: true)
 
-        let context = backdropContext(
-            for: resolved,
-            on: screen,
-            windowFrame: window?.frame ?? frame
-        )
-        let view = ClockView(appearance: resolved, backdropContext: context)
+        let view = ClockView(appearance: resolved)
         let hosting = NSHostingView(rootView: view)
         hosting.safeAreaRegions = []
         hosting.wantsLayer = true
-        if resolved.backdropBlur {
-            hosting.layer?.backgroundColor = NSColor.clear.cgColor
-        }
         window?.contentView = hosting
         hostingView = hosting
-    }
-
-    private func backdropContext(
-        for appearance: ClockAppearance,
-        on screen: NSScreen,
-        windowFrame: NSRect?
-    ) -> ClockBackdropContext? {
-        guard appearance.backdropBlur, let windowFrame else { return nil }
-        guard let wallpaper = WallpaperImage.current(for: screen) else {
-            LockClockLog.info("Backdrop blur: no lock-screen wallpaper for \(screen.localizedName)")
-            return nil
-        }
-        return ClockBackdropContext(
-            wallpaper: wallpaper,
-            screenFrame: screen.frame,
-            windowFrame: windowFrame
-        )
     }
 
     func show(using manager: SystemWindowManager, on screen: NSScreen) {

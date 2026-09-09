@@ -121,7 +121,6 @@ enum AppleLockScreenClock {
         appearance.opacity = 1.0
         appearance.color = .white
         appearance.showSeconds = false
-        appearance.backdropBlur = false
         appearance.placement = layout.clockPlacement()
         appearance.systemFontIdentifier = prefs.fontIdentifier
         appearance.systemFontWeight = prefs.fontWeight

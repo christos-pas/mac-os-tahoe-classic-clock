@@ -9,7 +9,6 @@ final class SettingsModel: ObservableObject {
     @Published var colorPosition: Double
     @Published var opacity: Double
     @Published var showSeconds: Bool
-    @Published var backdropBlur: Bool
     @Published var matchSystemClock: Bool
     @Published var horizontalFraction: Double
     @Published var verticalFraction: Double
@@ -26,7 +25,6 @@ final class SettingsModel: ObservableObject {
         colorPosition = ColorSpectrum.position(for: appearance.color)
         opacity = Double(appearance.opacity)
         showSeconds = appearance.showSeconds
-        backdropBlur = appearance.backdropBlur
         matchSystemClock = appearance.matchSystemClock
         horizontalFraction = Double(appearance.placement.horizontalFraction)
         verticalFraction = Double(appearance.placement.verticalFraction)
@@ -42,7 +40,6 @@ final class SettingsModel: ObservableObject {
         colorPosition = ColorSpectrum.position(for: appearance.color)
         opacity = Double(appearance.opacity)
         showSeconds = appearance.showSeconds
-        backdropBlur = appearance.backdropBlur
         matchSystemClock = appearance.matchSystemClock
         horizontalFraction = Double(appearance.placement.horizontalFraction)
         verticalFraction = Double(appearance.placement.verticalFraction)
@@ -59,7 +56,6 @@ final class SettingsModel: ObservableObject {
         appearance.color = ColorSpectrum.nsColor(at: colorPosition)
         appearance.opacity = CGFloat(opacity)
         appearance.showSeconds = showSeconds
-        appearance.backdropBlur = backdropBlur
         appearance.matchSystemClock = matchSystemClock
         appearance.placement.horizontalFraction = CGFloat(horizontalFraction)
         appearance.placement.verticalFraction = CGFloat(verticalFraction)
@@ -84,7 +80,6 @@ final class SettingsModel: ObservableObject {
         colorPosition = ColorSpectrum.position(for: appearance.color)
         opacity = Double(appearance.opacity)
         showSeconds = appearance.showSeconds
-        backdropBlur = appearance.backdropBlur
         matchSystemClock = appearance.matchSystemClock
         horizontalFraction = Double(appearance.placement.horizontalFraction)
         verticalFraction = Double(appearance.placement.verticalFraction)
@@ -98,7 +93,6 @@ final class SettingsModel: ObservableObject {
             && abs(lhs.size - rhs.size) < 0.5
             && abs(lhs.opacity - rhs.opacity) < 0.01
             && lhs.showSeconds == rhs.showSeconds
-            && lhs.backdropBlur == rhs.backdropBlur
             && lhs.matchSystemClock == rhs.matchSystemClock
             && abs(lhs.placement.horizontalFraction - rhs.placement.horizontalFraction) < 0.001
             && abs(lhs.placement.verticalFraction - rhs.placement.verticalFraction) < 0.001
@@ -121,7 +115,6 @@ final class SettingsModel: ObservableObject {
         appearance.color = ColorSpectrum.nsColor(at: colorPosition)
         appearance.opacity = CGFloat(opacity)
         appearance.showSeconds = showSeconds
-        appearance.backdropBlur = backdropBlur
         appearance.matchSystemClock = matchSystemClock
         appearance.placement.horizontalFraction = CGFloat(horizontalFraction)
         appearance.placement.verticalFraction = CGFloat(verticalFraction)
@@ -260,7 +253,6 @@ struct SettingsView: View {
         .onChange(of: model.colorPosition) { _, _ in model.persist() }
         .onChange(of: model.opacity) { _, _ in model.persist() }
         .onChange(of: model.showSeconds) { _, _ in model.persist() }
-        .onChange(of: model.backdropBlur) { _, _ in model.persist() }
         .onChange(of: model.matchSystemClock) { _, _ in model.persist() }
         .onChange(of: model.horizontalFraction) { _, _ in model.persist() }
         .onChange(of: model.verticalFraction) { _, _ in model.persist() }
@@ -368,7 +360,6 @@ struct SettingsView: View {
                 ColorTrackSlider(position: $model.colorPosition)
                 slider("Size", value: $model.size, range: 60...240, format: "%.0f")
                 slider("Opacity", value: $model.opacity, range: 0.2...1, format: "%.2f")
-                Toggle("Backdrop blur (experimental)", isOn: $model.backdropBlur)
             }
             .disabled(!model.launchAtLogin || model.matchSystemClock)
 
@@ -467,7 +458,7 @@ struct LockScreenPreview: View {
             ZStack {
                 previewBackground
                 if let clockSize {
-                    ClockView(appearance: appearance, scale: scale, usesWindowBackdrop: false)
+                    ClockView(appearance: appearance, scale: scale)
                         .opacity(enabled ? 1 : 0.35)
                         .position(
                             SystemClockLayout.previewCenter(
@@ -478,7 +469,7 @@ struct LockScreenPreview: View {
                             )
                         )
                 }
-                ClockView(appearance: appearance, scale: scale, usesWindowBackdrop: false)
+                ClockView(appearance: appearance, scale: scale)
                     .fixedSize()
                     .hidden()
                     .background(

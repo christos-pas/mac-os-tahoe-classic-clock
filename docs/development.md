@@ -373,8 +373,4 @@ Font family values are persisted as `system`, `lockScreen.<id>` (Rounded / Class
 
 Supported weights: `thin`, `light`, `regular`, `medium`, `semibold`, `bold`.
 
-There is no glass, blur, or translucency material by default. The text is a normal SwiftUI `Text` inside a clear, click-through `NSWindow`. Optional **Backdrop blur (experimental)** in Settings draws a screen-aligned, Core Image–blurred copy of the configured lock-screen wallpaper under the clock. macOS does not expose live backdrop samples on the lock screen, so this is an approximation (static images match best; video/Aerial may drift).
-
-```bash
-defaults write app.lockclock.LockClock clock.backdropBlur -bool true
-```
+There is no glass, blur, or translucency material. The text is a normal SwiftUI `Text` inside a clear, click-through `NSWindow`.
